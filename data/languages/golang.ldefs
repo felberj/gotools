@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/language_definitions.rxg -->
+<language_definitions>
+   <language processor="x86"
+            endian="little"
+            size="64"
+            variant="default"
+            version="1.0"
+            slafile="x86-64.sla"
+            processorspec="x86-64.pspec"
+            manualindexfile="../manuals/x86.idx"
+            id="x86:LE:64:golang">
+    <description>Go Language Module</description>
+    <compiler name="go1.12" spec="golang1.12.cspec" id="default"/>
+  </language> 
+</language_definitions>
