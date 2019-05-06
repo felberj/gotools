@@ -61,7 +61,7 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
         int maxWrite = 0;
         int minWrite = Integer.MAX_VALUE;
         m.setMessage(String.format("return type analysis of %s", f.getName()));
-        if (!f.getName().contains("A0r4") && !f.getName().contains("A0r2") && !f.getName().contains("A2r2")) {
+        if (!f.getName().contains("A0r1")) {
            // return;
         }
         try {
@@ -99,6 +99,10 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
         int numberOfRet = 0;
         if (minWrite <= maxWrite) {
             numberOfRet = (maxWrite - minWrite) / pointerSize + 1;
+        }
+        if (totalArgReturnVals > 10) {
+            log.appendMsg(String.format("Skipped function %s because it has %d arguments", f.getName(), totalArgReturnVals));
+            return;
         }
         long numberOfArgs = totalArgReturnVals - numberOfRet;
         if (f.getReturnType().getLength() != numberOfRet * pointerSize) {

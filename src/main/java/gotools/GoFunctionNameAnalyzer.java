@@ -68,25 +68,27 @@ public class GoFunctionNameAnalyzer extends AnalyzerBase {
             }
             Address funcPointer = p.getAddressFactory().getDefaultAddressSpace().getAddress(funcOffset);
             Function f = p.getFunctionManager().getFunctionAt(funcPointer);
+            String functionName = (String)(d.getValue());
+            if (functionName.startsWith("type..") || functionName.endsWith(".")) {
+                // TODO what to do with it?
+                p.getListing().setComment(funcPointer, CodeUnit.EOL_COMMENT, functionName);
+                continue;
+            }
+            if (gopc.contains(funcPointer)) {
+                log.appendMsg(String.format("skipped %s because it is in the section", functionName));
+                continue;
+            }
             if (f == null) {
-                String functionName = (String)(d.getValue());
-                if (functionName.startsWith("type..")) {
-                    // TODO what to do with it?
-                    p.getListing().setComment(funcPointer, CodeUnit.EOL_COMMENT, functionName);
-                    continue;
-                }
-                if (gopc.contains(funcPointer)) {
-                    log.appendMsg(String.format("skipped %s because it is in the section", functionName));
-                    continue;
-                }
                 CreateFunctionCmd cmd = new CreateFunctionCmd(functionName, funcPointer, null, SourceType.ANALYSIS);
                 if (!cmd.applyTo(p, m)) {
                     log.appendMsg(String.format("Unable to create function at %s, (expected %s)\n", d.getAddress(), d.getValue()));
                 }
                 continue;
+            } else if (f.getName().equals(functionName)){
+                continue;
             }
             try {
-                f.setName((String)(d.getValue()), SourceType.ANALYSIS);
+                f.setName(functionName, SourceType.ANALYSIS);
             } catch (DuplicateNameException | InvalidInputException e) {
                 log.appendException(e);
                 continue;
