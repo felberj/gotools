@@ -29,7 +29,6 @@ import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.exception.InvalidInputException;
 import ghidra.util.task.TaskMonitor;
-
 import java.util.List;
 import java.util.Vector;
 
@@ -38,122 +37,129 @@ import java.util.Vector;
  * does.
  */
 public class GoReturntypeAnalyzer extends AnalyzerBase {
+  public GoReturntypeAnalyzer() {
+    super("Go Return Type Analyzer", "Tries to recover the return type of go binaries.",
+        AnalyzerType.FUNCTION_ANALYZER);
+    setPriority(AnalysisPriority.LOW_PRIORITY);
+  }
 
-    public GoReturntypeAnalyzer() {
-        super("Go Return Type Analyzer", "Tries to recover the return type of go binaries.", AnalyzerType.FUNCTION_ANALYZER);
-        setPriority(AnalysisPriority.LOW_PRIORITY);
+  @Override
+  public boolean added(Program p, AddressSetView set, TaskMonitor monitor, MessageLog log)
+      throws CancelledException {
+    this.detectReturnTypes(p, monitor, log);
+    return true;
+  }
+
+  private void detectReturnTypes(Program p, TaskMonitor m, MessageLog log) {
+    for (Function f : p.getFunctionManager().getFunctionsNoStubs(true)) {
+      detectReturnTypes(p, m, log, f);
     }
+  }
 
-    @Override
-    public boolean added(Program p, AddressSetView set, TaskMonitor monitor, MessageLog log) throws CancelledException {
-        this.detectReturnTypes(p, monitor, log);
-        return true;
+  private void detectReturnTypes(Program p, TaskMonitor m, MessageLog log, Function f) {
+    int maxOffset = 0;
+    int maxWrite = 0;
+    int minWrite = Integer.MAX_VALUE;
+    m.setMessage(String.format("return type analysis of %s", f.getName()));
+    if (!f.getName().contains("A0r1")) {
+      // return;
     }
-
-    private void detectReturnTypes(Program p, TaskMonitor m, MessageLog log) {
-        for (Function f : p.getFunctionManager().getFunctionsNoStubs(true)) {
-            detectReturnTypes(p, m, log, f);
+    try {
+      f.setCallingConvention("go__stdcall");
+    } catch (InvalidInputException e) {
+      log.appendException(e);
+    }
+    ReferenceManager refMgr = p.getReferenceManager();
+    for (Address fromAddr : refMgr.getReferenceSourceIterator(f.getBody(), true)) {
+      for (Reference ref : refMgr.getReferencesFrom(fromAddr)) {
+        if (!ref.isStackReference()) {
+          continue;
         }
-    }
-
-    private void detectReturnTypes(Program p, TaskMonitor m, MessageLog log, Function f) {
-        int maxOffset = 0;
-        int maxWrite = 0;
-        int minWrite = Integer.MAX_VALUE;
-        m.setMessage(String.format("return type analysis of %s", f.getName()));
-        if (!f.getName().contains("A0r1")) {
-           // return;
+        StackReference stackRef = (StackReference) ref;
+        if (stackRef.getStackOffset() < 0) {
+          continue;
         }
-        try {
-            f.setCallingConvention("go__stdcall");
-        } catch (InvalidInputException e) {
+        if (stackRef.getStackOffset() > maxOffset) {
+          maxOffset = stackRef.getStackOffset();
+        }
+        if (ref.getReferenceType() != RefType.WRITE) {
+          continue; // no indicator of "return" type
+        }
+        if (stackRef.getStackOffset() > maxWrite) {
+          maxWrite = stackRef.getStackOffset();
+        }
+        if (stackRef.getStackOffset() < minWrite) {
+          minWrite = stackRef.getStackOffset();
+        }
+      }
+    }
+    // TODO only works for 64 bit binaries
+    int pointerSize = 8;
+    long totalArgReturnVals = maxOffset / pointerSize;
+    int numberOfRet = 0;
+    if (minWrite <= maxWrite) {
+      numberOfRet = (maxWrite - minWrite) / pointerSize + 1;
+    }
+    if (totalArgReturnVals > 10) {
+      log.appendMsg(String.format(
+          "Skipped function %s because it has %d arguments", f.getName(), totalArgReturnVals));
+      return;
+    }
+    long numberOfArgs = totalArgReturnVals - numberOfRet;
+    if (f.getReturnType().getLength() != numberOfRet * pointerSize) {
+      try {
+        switch (numberOfRet) {
+          case 0:
+            f.setReturnType(DataType.VOID, SourceType.ANALYSIS);
+            break;
+          case 1:
+            f.setCustomVariableStorage(true);
+            Undefined8DataType t = new Undefined8DataType();
+            f.setReturn(t, new VariableStorage(p, minWrite, t.getLength()), SourceType.ANALYSIS);
+            break;
+          default:
+            f.setCustomVariableStorage(true);
+            StructureDataType s =
+                new StructureDataType(String.format("ret_%d", f.getSymbol().getID()), 0);
+            for (int i = 0; i < numberOfRet; i++) {
+              s.add(new Undefined8DataType());
+            }
+            f.setReturn(s, new VariableStorage(p, minWrite, s.getLength()), SourceType.ANALYSIS);
+            break;
+        }
+      } catch (InvalidInputException e) {
+        log.appendException(e);
+      }
+    }
+    if (f.getParameterCount() != numberOfArgs) {
+      // Set the parameters
+      Parameter[] params = f.getParameters();
+      List<Variable> newParams = new Vector<>();
+      for (int i = 0; i < numberOfArgs; i++) {
+        if (params != null && params.length > i) {
+          newParams.add(params[i]);
+        } else {
+          VariableStorage v =
+              f.getCallingConvention().getArgLocation(i, params, new Undefined8DataType(), p);
+          try {
+            Variable var =
+                new ParameterImpl(null, new Undefined8DataType(), v, p, SourceType.ANALYSIS);
+            newParams.add(var); // TODO why so complicated?!
+          } catch (InvalidInputException e) {
             log.appendException(e);
-        }
-        ReferenceManager refMgr = p.getReferenceManager();
-        for (Address fromAddr : refMgr.getReferenceSourceIterator(f.getBody(), true)) {
-            for (Reference ref : refMgr.getReferencesFrom(fromAddr)) {
-                if (!ref.isStackReference()) {
-                    continue;
-                }
-                StackReference stackRef = (StackReference) ref;
-                if (stackRef.getStackOffset() < 0) {
-                    continue;
-                }
-                if (stackRef.getStackOffset() > maxOffset) {
-                    maxOffset = stackRef.getStackOffset();
-                }
-                if (ref.getReferenceType() != RefType.WRITE) {
-                    continue; // no indicator of "return" type
-                }
-                if (stackRef.getStackOffset() > maxWrite) {
-                    maxWrite = stackRef.getStackOffset();
-                }
-                if (stackRef.getStackOffset() < minWrite) {
-                    minWrite = stackRef.getStackOffset();
-                }
-            }
-        }
-        // TODO only works for 64 bit binaries
-        int pointerSize = 8;
-        long totalArgReturnVals = maxOffset / pointerSize;
-        int numberOfRet = 0;
-        if (minWrite <= maxWrite) {
-            numberOfRet = (maxWrite - minWrite) / pointerSize + 1;
-        }
-        if (totalArgReturnVals > 10) {
-            log.appendMsg(String.format("Skipped function %s because it has %d arguments", f.getName(), totalArgReturnVals));
             return;
+          }
         }
-        long numberOfArgs = totalArgReturnVals - numberOfRet;
-        if (f.getReturnType().getLength() != numberOfRet * pointerSize) {
-            try {
-                switch (numberOfRet) {
-                    case 0:
-                        f.setReturnType(DataType.VOID, SourceType.ANALYSIS);
-                        break;
-                    case 1:
-                    	f.setCustomVariableStorage(true);
-                    	Undefined8DataType t = new Undefined8DataType();
-                        f.setReturn(t, new VariableStorage(p, minWrite, t.getLength()), SourceType.ANALYSIS);
-                        break;
-                    default:
-                    	f.setCustomVariableStorage(true);
-                        StructureDataType s = new StructureDataType(String.format("ret_%d", f.getSymbol().getID()), 0);
-                        for (int i = 0; i < numberOfRet; i++) {
-                            s.add(new Undefined8DataType());
-                        }
-                        f.setReturn(s, new VariableStorage(p, minWrite, s.getLength()), SourceType.ANALYSIS);
-                        break;
-                }
-            } catch (InvalidInputException e) {
-                log.appendException(e);
-            }
-        }
-        if (f.getParameterCount() != numberOfArgs) {
-            // Set the parameters
-            Parameter[] params = f.getParameters();
-            List<Variable> newParams = new Vector<>();
-            for (int i = 0; i < numberOfArgs; i++) {
-                if (params != null && params.length > i) {
-                    newParams.add(params[i]);
-                } else {
-                    VariableStorage v = f.getCallingConvention().getArgLocation(i, params, new Undefined8DataType(), p);
-                    try {
-                        Variable var = new ParameterImpl(null, new Undefined8DataType(), v, p, SourceType.ANALYSIS);
-                        newParams.add(var); // TODO why so complicated?!
-                    } catch (InvalidInputException e) {
-                        log.appendException(e);
-                        return;
-                    }
-                }
-            }
-            try {
-                f.replaceParameters(newParams, Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS, false, SourceType.ANALYSIS);
-            } catch (DuplicateNameException | InvalidInputException e) {
-                log.appendException(e);
-                return;
-            }
-        }
-        System.out.printf("Function %s has %d arguments and %d return values. Max offset: %d\n", f.getName(), numberOfArgs, numberOfRet, maxOffset);
+      }
+      try {
+        f.replaceParameters(newParams, Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,
+            false, SourceType.ANALYSIS);
+      } catch (DuplicateNameException | InvalidInputException e) {
+        log.appendException(e);
+        return;
+      }
     }
+    System.out.printf("Function %s has %d arguments and %d return values. Max offset: %d\n",
+        f.getName(), numberOfArgs, numberOfRet, maxOffset);
+  }
 }

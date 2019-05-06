@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package gotools;
-
-import java.io.IOException;
-import java.util.*;
 
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.ByteProvider;
@@ -28,57 +25,55 @@ import ghidra.framework.model.DomainObject;
 import ghidra.program.model.listing.Program;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * TODO: Provide class-level documentation that describes what this loader does.
  */
 public class GotoolsLoader extends AbstractLibrarySupportLoader {
+  @Override
+  public String getName() {
+    // TODO: Name the loader.  This name must match the name of the loader in
+    // the .opinion files.
 
-	@Override
-	public String getName() {
+    return "My loader";
+  }
 
-		// TODO: Name the loader.  This name must match the name of the loader in the .opinion 
-		// files.
+  @Override
+  public Collection<LoadSpec> findSupportedLoadSpecs(ByteProvider provider) throws IOException {
+    List<LoadSpec> loadSpecs = new ArrayList<>();
 
-		return "My loader";
-	}
+    // TODO: Examine the bytes in 'provider' to determine if this loader can
+    // load it.  If it can load it, return the appropriate load specifications.
 
-	@Override
-	public Collection<LoadSpec> findSupportedLoadSpecs(ByteProvider provider) throws IOException {
-		List<LoadSpec> loadSpecs = new ArrayList<>();
+    return loadSpecs;
+  }
 
-		// TODO: Examine the bytes in 'provider' to determine if this loader can load it.  If it 
-		// can load it, return the appropriate load specifications.
+  @Override
+  protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options,
+      Program program, MemoryConflictHandler handler, TaskMonitor monitor, MessageLog log)
+      throws CancelledException, IOException {
+    // TODO: Load the bytes from 'provider' into the 'program'.
+  }
 
-		return loadSpecs;
-	}
+  @Override
+  public List<Option> getDefaultOptions(ByteProvider provider, LoadSpec loadSpec,
+      DomainObject domainObject, boolean isLoadIntoProgram) {
+    List<Option> list =
+        super.getDefaultOptions(provider, loadSpec, domainObject, isLoadIntoProgram);
 
-	@Override
-	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options,
-			Program program, MemoryConflictHandler handler, TaskMonitor monitor, MessageLog log)
-			throws CancelledException, IOException {
+    // TODO: If this loader has custom options, add them to 'list'
+    list.add(new Option("Option name goes here", "Default option value goes here"));
 
-		// TODO: Load the bytes from 'provider' into the 'program'.
-	}
+    return list;
+  }
 
-	@Override
-	public List<Option> getDefaultOptions(ByteProvider provider, LoadSpec loadSpec,
-			DomainObject domainObject, boolean isLoadIntoProgram) {
-		List<Option> list =
-			super.getDefaultOptions(provider, loadSpec, domainObject, isLoadIntoProgram);
+  @Override
+  public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options) {
+    // TODO: If this loader has custom options, validate them here.  Not all
+    // options require validation.
 
-		// TODO: If this loader has custom options, add them to 'list'
-		list.add(new Option("Option name goes here", "Default option value goes here"));
-
-		return list;
-	}
-
-	@Override
-	public String validateOptions(ByteProvider provider, LoadSpec loadSpec, List<Option> options) {
-
-		// TODO: If this loader has custom options, validate them here.  Not all options require
-		// validation.
-
-		return super.validateOptions(provider, loadSpec, options);
-	}
+    return super.validateOptions(provider, loadSpec, options);
+  }
 }
