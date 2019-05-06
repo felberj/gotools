@@ -11,6 +11,12 @@ This is in a VERY early stage and for now only handles linux/x86_64 binaries.
 - Recover function names
 - Recover number of arguments and return type
 
+# Developers
+
+Code formatted with
+
+`clang-format -i -style=Google src/main/java/gotools/*.java`
+
 # References
 
 - [Reversing GO binaries like a pro](https://rednaga.io/2016/09/21/reversing_go_binaries_like_a_pro/)
