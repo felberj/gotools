@@ -5,6 +5,9 @@ Plugin to assist reversing Golang binaries with Ghidra.
 
 This is in a VERY early stage and for now only handles linux/x86_64 binaries.
 
+# Usage
+
+When importing, select the Language **x86:LE:64:golang:default**
 
 # Features
 

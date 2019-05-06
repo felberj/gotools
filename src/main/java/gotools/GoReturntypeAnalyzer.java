@@ -106,32 +106,38 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
       return;
     }
     long numberOfArgs = totalArgReturnVals - numberOfRet;
-    if (f.getReturnType().getLength() != numberOfRet * pointerSize) {
+    if (f.getReturnType().getLength() != numberOfRet * pointerSize
+        || (numberOfRet != 0 && f.getReturn().getStackOffset() != minWrite)) {
+      f.setCustomVariableStorage(true);
       try {
         switch (numberOfRet) {
           case 0:
             f.setReturnType(DataType.VOID, SourceType.ANALYSIS);
             break;
           case 1:
-            f.setCustomVariableStorage(true);
             Undefined8DataType t = new Undefined8DataType();
-            f.setReturn(t, new VariableStorage(p, minWrite, t.getLength()), SourceType.ANALYSIS);
+            // The type is set to imported because otherwise we cannot overwrite it
+            f.setReturn(t, new VariableStorage(p, minWrite, t.getLength()), SourceType.IMPORTED);
             break;
           default:
-            f.setCustomVariableStorage(true);
             StructureDataType s =
                 new StructureDataType(String.format("ret_%d", f.getSymbol().getID()), 0);
             for (int i = 0; i < numberOfRet; i++) {
               s.add(new Undefined8DataType());
             }
-            f.setReturn(s, new VariableStorage(p, minWrite, s.getLength()), SourceType.ANALYSIS);
+            // The type is set to imported because otherwise we cannot overwrite it
+            f.setReturn(s, new VariableStorage(p, minWrite, s.getLength()), SourceType.IMPORTED);
             break;
         }
       } catch (InvalidInputException e) {
         log.appendException(e);
       }
     }
-    if (f.getParameterCount() != numberOfArgs) {
+    int paramenterLen = 0;
+    for (Parameter param : f.getParameters()) {
+      paramenterLen += param.getLength();
+    }
+    if (paramenterLen != numberOfArgs) {
       // Set the parameters
       Parameter[] params = f.getParameters();
       List<Variable> newParams = new Vector<>();

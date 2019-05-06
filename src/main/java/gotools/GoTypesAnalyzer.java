@@ -9,7 +9,7 @@ import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
 public class GoTypesAnalyzer extends AnalyzerBase {
-  GoTypesAnalyzer() {
+  public GoTypesAnalyzer() {
     super("Go Types Analyzer", "Analyzes Types like string and slices",
         AnalyzerType.FUNCTION_ANALYZER);
   }
@@ -19,13 +19,14 @@ public class GoTypesAnalyzer extends AnalyzerBase {
       MessageLog messageLog) throws CancelledException {
     StructureDataType s = new StructureDataType("GoString", 0);
     s.add(new QWordDataType(), "len", null);
-    s.add(new PointerDataType(new CharDataType()), "str", null);
+    s.add(new Pointer64DataType(new CharDataType()), "str", null);
     program.getDataTypeManager().addDataType(s, DataTypeConflictHandler.KEEP_HANDLER);
 
     StructureDataType sl = new StructureDataType("GoSlice", 0);
+    sl.add(new PointerDataType(), 8, "data", null);
     sl.add(new QWordDataType(), "len", null);
     sl.add(new QWordDataType(), "cap", null);
-    sl.add(new PointerDataType());
+
     program.getDataTypeManager().addDataType(sl, DataTypeConflictHandler.KEEP_HANDLER);
     return false;
   }
