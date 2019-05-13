@@ -5,6 +5,13 @@ Plugin to assist reversing Golang binaries with Ghidra.
 
 This is in a VERY early stage and for now only handles linux/x86_64 binaries.
 
+# Installation
+
+1. Download the release for your Ghidra version
+2. Copy ZIP to `$GHIDRA_DIR/Extensions/Ghidra/`
+3. Start Ghidra, `File > Install Extensions`, check the box next to *gotools*
+4. Restart Ghidra
+
 # Usage
 
 When importing, select the Language **x86:LE:64:golang:default**
