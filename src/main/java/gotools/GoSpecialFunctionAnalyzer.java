@@ -11,7 +11,7 @@ import ghidra.util.task.TaskMonitor;
 
 public class GoSpecialFunctionAnalyzer extends AnalyzerBase {
   public GoSpecialFunctionAnalyzer() {
-    super("Golang Special functions analyzer", "analyzes special functiosn in go",
+    super("Golang Special functions analyzer", "analyzes special functions in go",
         AnalyzerType.FUNCTION_ANALYZER);
   }
 

@@ -24,7 +24,18 @@ import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.StructureDataType;
 import ghidra.program.model.data.Undefined8DataType;
 import ghidra.program.model.listing.*;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.listing.ParameterImpl;
+import ghidra.program.model.listing.Program;
+import ghidra.program.model.listing.Variable;
+import ghidra.program.model.listing.VariableStorage;
 import ghidra.program.model.symbol.*;
+import ghidra.program.model.symbol.RefType;
+import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.ReferenceManager;
+import ghidra.program.model.symbol.SourceType;
+import ghidra.program.model.symbol.StackReference;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.exception.InvalidInputException;
@@ -61,11 +72,12 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
     int maxWrite = 0;
     int minWrite = Integer.MAX_VALUE;
     m.setMessage(String.format("return type analysis of %s", f.getName()));
-    if (!f.getName().contains("A0r1")) {
-      // return;
+    if (!f.getName().contains("main.A")) {
+      //return;
     }
     try {
       f.setCallingConvention("go__stdcall");
+      //f.setCallingConvention("unknown");
     } catch (InvalidInputException e) {
       log.appendException(e);
     }
@@ -106,9 +118,43 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
       return;
     }
     long numberOfArgs = totalArgReturnVals - numberOfRet;
+    // 1. Set arguments
+    int paramenterLen = 0;
+    for (Parameter param : f.getParameters()) {
+      paramenterLen += param.getLength();
+    }
+    if (paramenterLen != numberOfArgs) {
+      // Set the parameters
+      Parameter[] params = f.getParameters();
+      List<Variable> newParams = new Vector<>();
+      for (int i = 0; i < numberOfArgs; i++) {
+        if (params != null && params.length > i) {
+          newParams.add(params[i]);
+        } else {
+          VariableStorage v =
+                  f.getCallingConvention().getArgLocation(i, params, new Undefined8DataType(), p);
+          try {
+            Variable var =
+                    new ParameterImpl(null, new Undefined8DataType(), v, p, SourceType.ANALYSIS);
+            newParams.add(var); // TODO why so complicated?!
+          } catch (InvalidInputException e) {
+            log.appendException(e);
+            return;
+          }
+        }
+      }
+      try {
+        f.replaceParameters(newParams, Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,
+                false, SourceType.ANALYSIS);
+      } catch (DuplicateNameException | InvalidInputException e) {
+        log.appendException(e);
+        return;
+      }
+    }
+    // set return type
+    f.setCustomVariableStorage(true);
     if (f.getReturnType().getLength() != numberOfRet * pointerSize
         || (numberOfRet != 0 && f.getReturn().getStackOffset() != minWrite)) {
-      f.setCustomVariableStorage(true);
       try {
         switch (numberOfRet) {
           case 0:
@@ -131,38 +177,6 @@ public class GoReturntypeAnalyzer extends AnalyzerBase {
         }
       } catch (InvalidInputException e) {
         log.appendException(e);
-      }
-    }
-    int paramenterLen = 0;
-    for (Parameter param : f.getParameters()) {
-      paramenterLen += param.getLength();
-    }
-    if (paramenterLen != numberOfArgs) {
-      // Set the parameters
-      Parameter[] params = f.getParameters();
-      List<Variable> newParams = new Vector<>();
-      for (int i = 0; i < numberOfArgs; i++) {
-        if (params != null && params.length > i) {
-          newParams.add(params[i]);
-        } else {
-          VariableStorage v =
-              f.getCallingConvention().getArgLocation(i, params, new Undefined8DataType(), p);
-          try {
-            Variable var =
-                new ParameterImpl(null, new Undefined8DataType(), v, p, SourceType.ANALYSIS);
-            newParams.add(var); // TODO why so complicated?!
-          } catch (InvalidInputException e) {
-            log.appendException(e);
-            return;
-          }
-        }
-      }
-      try {
-        f.replaceParameters(newParams, Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,
-            false, SourceType.ANALYSIS);
-      } catch (DuplicateNameException | InvalidInputException e) {
-        log.appendException(e);
-        return;
       }
     }
     System.out.printf("Function %s has %d arguments and %d return values. Max offset: %d\n",
